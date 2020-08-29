@@ -1,0 +1,77 @@
+###Archivo con datos del Nasdaq
+#Leer el archivo, los datos se extraen de una base de datos privada de información
+#financiera (Refinitiv) y se limpiaron previamente en Excel (NULL y otras leyendas )
+nasdaq<-read.csv(file="nasdaq.csv")
+#Cambiar el nombre de las variables
+variables<-c("RIC", "Nombre", "Last","Net","Var_pc","pdclose","currency","Hist_pe3y","PE_daily","price2019")
+names(nasdaq)=variables
+#cambiar price 2019 a numeric
+nasdaq$price2019<-as.numeric(nasdaq$price2019)
+View(nasdaq)
+######
+###Archivo con volúmenes de operación de firmas del Nasdaq
+#Leer el archivo con los volúmenes promedios de operación de las acciones
+nas_vol<-read.csv(file="nasdaq_vol.csv")
+#Eliminar la columna 2
+nas_vol<-nas_vol[,-2]
+#Ver el nombre de las columnas y luego cambiarlas
+names(nas_vol)
+variables2<-c("RIC","avg_vol12m","avg_vol30d")
+names(nas_vol)=variables2
+variables2<-c("RIC","avg_vol12m","avg_vol30d")
+names(nas_vol)=variables2
+######
+###Combinar el dataframe del Nasdaq, con los datos de volumen a través del RIC
+#combinar las 2 tablas por el RIC
+nasdaq<-merge(nasdaq,nas_vol,by="RIC")
+#Ordenar el df del Nasdaq por su último precio ("Last") de mayor a menor
+nasdaq<-nasdaq[order(nasdaq$Last,decreasing=TRUE),]
+######
+###Leer el archivo de NYSE
+nyse<-read.csv(file="nyse.csv")
+View(nyse)
+#Renombrar variables
+variables<-c("RIC", "Nombre", "Last","Net","Var_pc","pdclose","currency","Hist_pe3y","PE_daily","price2019","avg_vol12m","avg_vol30d")
+names(nyse)=variables
+
+######
+###Crear dataframe llamado "acciones" con datos de "nasdaq" y de "nyse"
+acciones<-rbind(nyse,nasdaq)
+View(acciones)
+#Ordenar el df de "acciones" por su último precio ("Last") de mayor a menor
+acciones<-acciones[order(acciones$Last,decreasing=TRUE),]
+#Obtener precio de acciones en pesos (tipo de cambio promedio del año)
+acciones$pesos<-acciones$Last*21.80860366
+#Eliminar columna
+acciones<-acciones[-2,]
+#Hacer variable numérica
+acciones$price2019<-as.numeric(acciones$price2019)
+#Crear variable con variación porcentual entre precio cierre 2019 y último ("Last")
+acciones$rendimiento<-((acciones$Last/acciones$price2019)-1)*100
+#Ordenar el df de "acciones" por su último precio ("Last") de mayor a menor
+acciones<-acciones[order(acciones$Last,decreasing=TRUE),]
+View(acciones)
+#Reordenar columnas
+library(dplyr)
+acciones<- acciones %>% select("RIC","Nombre","rendimiento","price2019","Last",
+                               "Net","Var_pc","pdclose","currency","Hist_pe3y",
+                               "PE_daily","avg_vol12m","avg_vol30d","pesos")
+##MODIFICAR A 2 DÍGITOS EN DF para gráfica
+acciones$rendimiento<-round(acciones$rendimiento, digits=2)
+View(acciones)
+###Crear un subconjunto diferente solo con acciones FAANG
+faang<-c("AMZN.OQ", "GOOG.OQ","NFLX.OQ","FB.OQ","AAPL.OQ")
+df_fa<- filter (acciones, RIC %in% faang)
+######Graficar rendimiento
+library(ggplot2)
+#mostrar en ventana aparte
+x11()
+#gráfica color rosa y sin cuadro de leyenda
+#si se cambiara fill a nombre de la variable sin comillas, se ilumina
+#tipo gradiente según el color de la variable
+ggplot(data=df_fa, aes(x=reorder(RIC,-rendimiento),y=rendimiento, fill="darkturquoise"))+
+  geom_bar(stat="identity",width=0.5)+
+  labs(x="Emisora",y="Rend. % en 2020")+
+    geom_text(aes(label=rendimiento),position=position_dodge(width=0.9),vjust=-0.25)+
+  ggtitle("Rendimiento de FAANG en 2020") +
+  theme(plot.title = element_text(hjust = 0.5), legend.position ="none")
